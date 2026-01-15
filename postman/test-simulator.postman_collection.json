@@ -1,0 +1,686 @@
+{
+  "info": {
+    "name": "Test Simulator API",
+    "_postman_id": "2d25c3d8-5c85-4bca-9b3c-9f0d9d39a0e1",
+    "description": "Postman collection for test-simulator endpoints.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Launch Game",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/launch",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "launch"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_code\": \"{{agent_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"game_code\": \"{{game_code}}\",\n  \"currency\": \"{{currency}}\",\n  \"lang\": \"{{lang}}\",\n  \"bet_limit\": \"{{bet_limit}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Top Up Credit",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/credit/topup",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "credit",
+            "topup"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"player_account\": \"{{player_account}}\",\n  \"amount\": {{topup_amount}}\n}"
+        }
+      }
+    },
+    {
+      "name": "Check Balance",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/credit/balance",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "credit",
+            "balance"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"player_account\": \"{{player_account}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Seamless Callback - Balance",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/callback",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "callback"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"balance\",\n  \"agent_code\": \"{{agent_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"currency\": \"{{currency}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"game_code\": \"{{game_code}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Seamless Callback - Bet",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/callback",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "callback"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"bet\",\n  \"agent_code\": \"{{agent_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"currency\": \"{{currency}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"game_code\": \"{{game_code}}\",\n  \"round_id\": \"{{round_id}}\",\n  \"trans_data\": [\n    {\n      \"trans_id\": \"{{trans_id}}\",\n      \"bet_trans_id\": \"{{bet_trans_id}}\",\n      \"adjust_amount\": {{bet_amount}}\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Seamless Callback - Settle",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/callback",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "callback"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"settle\",\n  \"agent_code\": \"{{agent_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"currency\": \"{{currency}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"game_code\": \"{{game_code}}\",\n  \"round_id\": \"{{round_id}}\",\n  \"trans_data\": [\n    {\n      \"trans_id\": \"{{trans_id}}\",\n      \"bet_trans_id\": \"{{bet_trans_id}}\",\n      \"adjust_amount\": {{settle_amount}}\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Seamless Callback - Refund",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/callback",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "callback"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"refund\",\n  \"agent_code\": \"{{agent_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"currency\": \"{{currency}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"game_code\": \"{{game_code}}\",\n  \"round_id\": \"{{round_id}}\",\n  \"trans_data\": [\n    {\n      \"trans_id\": \"{{trans_id}}\",\n      \"bet_trans_id\": \"{{bet_trans_id}}\",\n      \"adjust_amount\": {{refund_amount}}\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Seamless Callback - Resettle",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/callback",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "callback"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"resettle\",\n  \"agent_code\": \"{{agent_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"currency\": \"{{currency}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"game_code\": \"{{game_code}}\",\n  \"round_id\": \"{{round_id}}\",\n  \"trans_data\": [\n    {\n      \"trans_id\": \"{{trans_id}}\",\n      \"bet_trans_id\": \"{{bet_trans_id}}\",\n      \"adjust_amount\": {{resettle_amount}}\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Seamless Callback - Betsettle",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/callback",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "callback"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"betsettle\",\n  \"agent_code\": \"{{agent_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"currency\": \"{{currency}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"game_code\": \"{{game_code}}\",\n  \"round_id\": \"{{round_id}}\",\n  \"trans_data\": [\n    {\n      \"trans_id\": \"{{trans_id}}\",\n      \"bet_trans_id\": \"{{bet_trans_id}}\",\n      \"adjust_amount\": {{betsettle_amount}}\n    }\n  ]\n}"
+        }
+      }
+    },
+    {
+      "name": "Transaction Listing",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/callbacks/list",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "callbacks",
+            "list"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"player_account\": \"{{player_account}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Transaction Delete",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/callbacks/delete",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "callbacks",
+            "delete"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"player_account\": \"{{player_account}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Wallet Deposit",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wallet/deposit?trace_id={{trace_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wallet",
+            "deposit"
+          ],
+          "query": [
+            {
+              "key": "trace_id",
+              "value": "{{trace_id}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_code\": \"{{agent_code}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"amount\": {{wallet_deposit_amount}},\n  \"currency\": \"{{wallet_currency}}\",\n  \"transaction_id\": \"{{wallet_transaction_id}}\",\n  \"type\": \"{{wallet_deposit_type}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Wallet Withdrawal",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wallet/withdrawal?trace_id={{trace_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wallet",
+            "withdrawal"
+          ],
+          "query": [
+            {
+              "key": "trace_id",
+              "value": "{{trace_id}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_code\": \"{{agent_code}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"amount\": {{wallet_withdrawal_amount}},\n  \"currency\": \"{{wallet_currency}}\",\n  \"transaction_id\": \"{{wallet_transaction_id}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Wallet Balance",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wallet/balance?trace_id={{trace_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wallet",
+            "balance"
+          ],
+          "query": [
+            {
+              "key": "trace_id",
+              "value": "{{trace_id}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_code\": \"{{agent_code}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"currency\": \"{{wallet_currency}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Wallet Check Transaction Status",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wallet/check-trans-status?trace_id={{trace_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wallet",
+            "check-trans-status"
+          ],
+          "query": [
+            {
+              "key": "trace_id",
+              "value": "{{trace_id}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_code\": \"{{agent_code}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"transaction_id\": \"{{wallet_transaction_id}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Wallet Void",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wallet/void?trace_id={{trace_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wallet",
+            "void"
+          ],
+          "query": [
+            {
+              "key": "trace_id",
+              "value": "{{trace_id}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"agent_code\": \"{{agent_code}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"amount\": {{wallet_void_amount}},\n  \"currency\": \"{{wallet_currency}}\",\n  \"transaction_id\": \"{{wallet_transaction_id}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Hybrid Callback - Add",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/hybrid/callback?trace_id={{trace_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "hybrid",
+            "callback"
+          ],
+          "query": [
+            {
+              "key": "trace_id",
+              "value": "{{trace_id}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"add\",\n  \"agent_code\": \"{{agent_code}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"amount\": {{hybrid_amount}},\n  \"currency\": \"{{wallet_currency}}\",\n  \"transaction_id\": \"{{hybrid_transaction_id}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Hybrid Callback - Deduct",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/hybrid/callback?trace_id={{trace_id}}",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "hybrid",
+            "callback"
+          ],
+          "query": [
+            {
+              "key": "trace_id",
+              "value": "{{trace_id}}"
+            }
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"action\": \"deduct\",\n  \"agent_code\": \"{{agent_code}}\",\n  \"provider_code\": \"{{provider_code}}\",\n  \"player_account\": \"{{player_account}}\",\n  \"amount\": {{hybrid_amount}},\n  \"currency\": \"{{wallet_currency}}\",\n  \"transaction_id\": \"{{hybrid_transaction_id}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Hybrid Transaction Listing",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wallet/transactions/list",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wallet",
+            "transactions",
+            "list"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"player_account\": \"{{player_account}}\"\n}"
+        }
+      }
+    },
+    {
+      "name": "Hybrid Transaction Delete",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/wallet/transactions/delete",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "wallet",
+            "transactions",
+            "delete"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"player_account\": \"{{player_account}}\"\n}"
+        }
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "agent_code",
+      "value": "YOUR_AGENT_CODE"
+    },
+    {
+      "key": "player_account",
+      "value": "player01"
+    },
+    {
+      "key": "provider_code",
+      "value": "slot"
+    },
+    {
+      "key": "game_code",
+      "value": "islot"
+    },
+    {
+      "key": "currency",
+      "value": "USD"
+    },
+    {
+      "key": "lang",
+      "value": "en"
+    },
+    {
+      "key": "bet_limit",
+      "value": "100"
+    },
+    {
+      "key": "topup_amount",
+      "value": 50
+    },
+    {
+      "key": "round_id",
+      "value": "round-123"
+    },
+    {
+      "key": "trans_id",
+      "value": "txn-1"
+    },
+    {
+      "key": "bet_trans_id",
+      "value": "bet-1"
+    },
+    {
+      "key": "bet_amount",
+      "value": -100
+    },
+    {
+      "key": "settle_amount",
+      "value": 100
+    },
+    {
+      "key": "refund_amount",
+      "value": 100
+    },
+    {
+      "key": "resettle_amount",
+      "value": 50
+    },
+    {
+      "key": "betsettle_amount",
+      "value": 100
+    },
+    {
+      "key": "trace_id",
+      "value": "TRACE_ID"
+    },
+    {
+      "key": "wallet_currency",
+      "value": "PHP"
+    },
+    {
+      "key": "wallet_deposit_amount",
+      "value": 1500000
+    },
+    {
+      "key": "wallet_withdrawal_amount",
+      "value": 61500
+    },
+    {
+      "key": "wallet_void_amount",
+      "value": 61500
+    },
+    {
+      "key": "wallet_transaction_id",
+      "value": "REF034"
+    },
+    {
+      "key": "wallet_deposit_type",
+      "value": "normal"
+    },
+    {
+      "key": "hybrid_amount",
+      "value": 5000
+    },
+    {
+      "key": "hybrid_transaction_id",
+      "value": "AGG-001"
+    }
+  ]
+}
