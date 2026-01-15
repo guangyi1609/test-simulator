@@ -7,7 +7,13 @@ $config = require __DIR__ . '/../config.php';
 header('Content-Type: application/json');
 
 $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$path = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/';
+$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+$path = parse_url($requestUri, PHP_URL_PATH) ?: '/';
+$queryParams = [];
+$queryString = parse_url($requestUri, PHP_URL_QUERY);
+if (is_string($queryString)) {
+    parse_str($queryString, $queryParams);
+}
 
 if ($method !== 'POST') {
     respond(405, ['error' => 'Method not allowed']);
@@ -27,6 +33,18 @@ switch ($path) {
         break;
     case '/api/credit/balance':
         handleBalance($payload, $config);
+        break;
+    case '/api/callback':
+        handleCallback($payload, $config);
+        break;
+    case '/api/callbacks/list':
+        handleCallbackList($payload, $config);
+        break;
+    case '/api/callbacks/delete':
+        handleCallbackDelete($payload, $config);
+        break;
+    case '/wallet/deposit':
+        handleWalletDeposit($payload, $config, $queryParams);
         break;
     default:
         respond(404, ['error' => 'Not found']);
@@ -104,14 +122,17 @@ function handleTopup(array $payload, array $config): void
     if ($playerData === null) {
         $playerData = createPlayer($playerAccount, $config);
     }
+    $playerData = normalizePlayerBalance($playerData);
 
     $playerData['balance'] = round(((float) ($playerData['balance'] ?? 0)) + $amount, 2);
+    $playerData['balance_cents'] = (int) round($playerData['balance'] * 100);
     $playerData['updated_at'] = gmdate('c');
     savePlayer($playerAccount, $playerData, $config);
 
     respond(200, [
         'player_account' => $playerAccount,
         'balance' => $playerData['balance'],
+        'balance_cents' => $playerData['balance_cents'],
     ]);
 }
 
@@ -126,11 +147,188 @@ function handleBalance(array $payload, array $config): void
     if ($playerData === null) {
         respond(404, ['error' => 'Player not found']);
     }
+    $playerData = normalizePlayerBalance($playerData);
 
     respond(200, [
         'player_account' => $playerAccount,
         'balance' => $playerData['balance'] ?? 0,
+        'balance_cents' => $playerData['balance_cents'] ?? 0,
         'token' => $playerData['token'] ?? null,
+    ]);
+}
+
+function handleCallback(array $payload, array $config): void
+{
+    $required = ['action', 'agent_code', 'player_account', 'currency', 'provider_code'];
+    foreach ($required as $field) {
+        if (empty($payload[$field]) || !is_string($payload[$field])) {
+            respond(200, ['status' => '206']);
+        }
+    }
+
+    $action = strtolower($payload['action']);
+    $action = str_replace(['-', '_'], '', $action);
+    $allowedActions = ['balance', 'bet', 'settle', 'refund', 'resettle', 'betsettle'];
+    if (!in_array($action, $allowedActions, true)) {
+        respond(200, ['status' => '206']);
+    }
+    $playerAccount = $payload['player_account'];
+    $playerData = loadPlayer($playerAccount, $config);
+    if ($playerData === null) {
+        respond(200, ['status' => '206']);
+    }
+    $playerData = normalizePlayerBalance($playerData);
+
+    if ($action === 'balance') {
+        appendCallbackLog($playerAccount, [
+            'datetime' => date('c'),
+            'action' => $action,
+            'payload' => $payload,
+            'adjustment_cents' => 0,
+            'balance_cents' => $playerData['balance_cents'],
+        ], $config);
+
+        respond(200, [
+            'status' => '000',
+            'player_account' => $playerAccount,
+            'wallet_balance' => $playerData['balance_cents'],
+            'updated_at' => gmdate('c'),
+            'currency' => $payload['currency'],
+        ]);
+    }
+
+    $required = ['game_code', 'round_id', 'trans_data'];
+    foreach ($required as $field) {
+        if (empty($payload[$field])) {
+            respond(200, ['status' => '206']);
+        }
+    }
+    if (!is_array($payload['trans_data'])) {
+        respond(200, ['status' => '206']);
+    }
+
+    [$adjustment, $transactionIds] = parseTransactionAdjustments($payload['trans_data']);
+    $duplicateIds = findDuplicateTransactionIds($transactionIds, $playerAccount, $config);
+    if ($duplicateIds !== []) {
+        respond(200, ['status' => '234']);
+    }
+
+    $newBalance = (int) $playerData['balance_cents'] + $adjustment;
+    if ($newBalance < 0) {
+        respond(200, ['status' => '227']);
+    }
+
+    $playerData['balance_cents'] = $newBalance;
+    $playerData['balance'] = round($playerData['balance_cents'] / 100, 2);
+    $playerData['updated_at'] = gmdate('c');
+    savePlayer($playerAccount, $playerData, $config);
+
+    appendCallbackLog($playerAccount, [
+        'datetime' => date('c'),
+        'action' => $action,
+        'payload' => $payload,
+        'adjustment_cents' => $adjustment,
+        'transaction_ids' => $transactionIds,
+        'balance_cents' => $playerData['balance_cents'],
+    ], $config);
+
+    respond(200, [
+        'status' => '000',
+        'player_account' => $playerAccount,
+        'wallet_balance' => $playerData['balance_cents'],
+    ]);
+}
+
+function handleWalletDeposit(array $payload, array $config, array $queryParams): void
+{
+    $required = ['agent_code', 'player_account', 'amount', 'currency'];
+    foreach ($required as $field) {
+        if (!isset($payload[$field]) || $payload[$field] === '') {
+            respond(200, ['status' => '206']);
+        }
+    }
+    if (!is_string($payload['player_account']) || !is_numeric($payload['amount'])) {
+        respond(200, ['status' => '206']);
+    }
+
+    $amount = (int) $payload['amount'];
+    if ($amount <= 0) {
+        respond(200, ['status' => '206']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $playerData = loadPlayer($playerAccount, $config);
+    if ($playerData === null) {
+        $playerData = createPlayer($playerAccount, $config);
+    }
+    $playerData = normalizePlayerBalance($playerData);
+    $playerData['balance_cents'] = (int) $playerData['balance_cents'] + $amount;
+    $playerData['balance'] = round($playerData['balance_cents'] / 100, 2);
+    $playerData['updated_at'] = gmdate('c');
+    savePlayer($playerAccount, $playerData, $config);
+
+    $response = [
+        'status' => '000',
+        'player_account' => $playerAccount,
+        'wallet_balance' => $playerData['balance_cents'],
+    ];
+    if (!empty($queryParams['trace_id'])) {
+        $response['trace_id'] = (string) $queryParams['trace_id'];
+    }
+
+    respond(200, $response);
+}
+
+function handleCallbackList(array $payload, array $config): void
+{
+    if (empty($payload['player_account']) || !is_string($payload['player_account'])) {
+        respond(422, ['error' => 'Missing or invalid field: player_account']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $path = callbackLogFilePath($playerAccount, $config);
+    if (!file_exists($path)) {
+        respond(200, [
+            'player_account' => $playerAccount,
+            'transactions' => [],
+        ]);
+    }
+
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        respond(500, ['error' => 'Failed to read callback transactions']);
+    }
+
+    $transactions = [];
+    foreach ($lines as $line) {
+        $decoded = json_decode($line, true);
+        if (is_array($decoded)) {
+            $transactions[] = $decoded;
+        }
+    }
+
+    respond(200, [
+        'player_account' => $playerAccount,
+        'transactions' => $transactions,
+    ]);
+}
+
+function handleCallbackDelete(array $payload, array $config): void
+{
+    if (empty($payload['player_account']) || !is_string($payload['player_account'])) {
+        respond(422, ['error' => 'Missing or invalid field: player_account']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $path = callbackLogFilePath($playerAccount, $config);
+    $deleted = false;
+    if (file_exists($path)) {
+        $deleted = unlink($path);
+    }
+
+    respond(200, [
+        'player_account' => $playerAccount,
+        'deleted' => $deleted,
     ]);
 }
 
@@ -200,6 +398,7 @@ function createPlayer(string $playerAccount, array $config): array
     $data = [
         'player_account' => $playerAccount,
         'balance' => 0,
+        'balance_cents' => 0,
         'token' => null,
         'created_at' => gmdate('c'),
         'updated_at' => gmdate('c'),
@@ -228,6 +427,94 @@ function savePlayer(string $playerAccount, array $data, array $config): void
     rename($tempFile, $path);
 }
 
+function normalizePlayerBalance(array $playerData): array
+{
+    $balance = isset($playerData['balance']) ? (float) $playerData['balance'] : 0.0;
+    $balanceCents = $playerData['balance_cents'] ?? null;
+    if ($balanceCents === null || !is_numeric($balanceCents)) {
+        $balanceCents = (int) round($balance * 100);
+    }
+
+    $playerData['balance'] = round($balanceCents / 100, 2);
+    $playerData['balance_cents'] = (int) $balanceCents;
+
+    return $playerData;
+}
+
+function parseTransactionAdjustments(array $transactions): array
+{
+    $adjustment = 0;
+    $transactionIds = [];
+
+    foreach ($transactions as $transaction) {
+        if (!is_array($transaction)) {
+            respond(200, ['status' => '206']);
+        }
+        $transId = $transaction['trans_id'] ?? null;
+        $betTransId = $transaction['bet_trans_id'] ?? null;
+        if (!is_string($transId) || $transId === '' || !is_string($betTransId) || $betTransId === '') {
+            respond(200, ['status' => '206']);
+        }
+        if (!isset($transaction['adjust_amount']) || !is_numeric($transaction['adjust_amount'])) {
+            respond(200, ['status' => '206']);
+        }
+        $transactionIds[] = $transId;
+        $adjustment += (int) $transaction['adjust_amount'];
+    }
+
+    return [$adjustment, $transactionIds];
+}
+
+function findDuplicateTransactionIds(array $transactionIds, string $playerAccount, array $config): array
+{
+    if ($transactionIds === []) {
+        return [];
+    }
+
+    $duplicates = [];
+    $counts = array_count_values($transactionIds);
+    foreach ($counts as $id => $count) {
+        if ($count > 1) {
+            $duplicates[] = $id;
+        }
+    }
+
+    $path = callbackLogFilePath($playerAccount, $config);
+    if (!file_exists($path)) {
+        return $duplicates;
+    }
+
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        respond(200, ['status' => '500']);
+    }
+
+    $existingIds = [];
+    foreach ($lines as $line) {
+        $decoded = json_decode($line, true);
+        if (!is_array($decoded)) {
+            continue;
+        }
+        $loggedIds = $decoded['transaction_ids'] ?? [];
+        if (!is_array($loggedIds)) {
+            continue;
+        }
+        foreach ($loggedIds as $loggedId) {
+            if (is_string($loggedId) && $loggedId !== '') {
+                $existingIds[$loggedId] = true;
+            }
+        }
+    }
+
+    foreach ($transactionIds as $transactionId) {
+        if (isset($existingIds[$transactionId])) {
+            $duplicates[] = $transactionId;
+        }
+    }
+
+    return array_values(array_unique($duplicates));
+}
+
 function playerFilePath(string $playerAccount, array $config): string
 {
     if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $playerAccount)) {
@@ -235,6 +522,31 @@ function playerFilePath(string $playerAccount, array $config): string
     }
 
     return rtrim($config['storage_path'], '/') . '/' . $playerAccount . '.json';
+}
+
+function callbackLogFilePath(string $playerAccount, array $config): string
+{
+    if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $playerAccount)) {
+        respond(422, ['error' => 'player_account must be alphanumeric with optional underscore or dash']);
+    }
+
+    return rtrim($config['callback_log_path'], '/') . '/' . $playerAccount . '.log';
+}
+
+function appendCallbackLog(string $playerAccount, array $entry, array $config): void
+{
+    $path = callbackLogFilePath($playerAccount, $config);
+    $directory = dirname($path);
+    if (!is_dir($directory)) {
+        mkdir($directory, 0775, true);
+    }
+
+    $line = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($line === false) {
+        respond(500, ['error' => 'Failed to encode callback log entry']);
+    }
+
+    file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
 function generateTraceId(): string
