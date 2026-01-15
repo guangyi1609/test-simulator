@@ -92,3 +92,115 @@ Handles seamless wallet callbacks from the aggregator. Supported actions include
   "player_account": "player01"
 }
 ```
+
+## Hybrid Wallet (Transfer Wallet) API
+
+These endpoints simulate the hybrid transfer wallet flow, including transaction logging per user in server timezone.
+
+### Deposit
+
+`POST /wallet/deposit?trace_id=TRACE_ID`
+
+```json
+{
+  "agent_code": "YOUR_AGENT_CODE",
+  "provider_code": "slot",
+  "player_account": "player01",
+  "amount": 1500000,
+  "currency": "PHP",
+  "transaction_id": "REF004",
+  "type": "normal"
+}
+```
+
+### Withdrawal
+
+`POST /wallet/withdrawal?trace_id=TRACE_ID`
+
+```json
+{
+  "agent_code": "YOUR_AGENT_CODE",
+  "provider_code": "slot",
+  "player_account": "player01",
+  "amount": 61500,
+  "currency": "PHP",
+  "transaction_id": "REF034"
+}
+```
+
+### Get Wallet Balance
+
+`POST /wallet/balance?trace_id=TRACE_ID`
+
+```json
+{
+  "agent_code": "YOUR_AGENT_CODE",
+  "provider_code": "slot",
+  "player_account": "player01",
+  "currency": "PHP"
+}
+```
+
+### Check Transaction Status
+
+`POST /wallet/check-trans-status?trace_id=TRACE_ID`
+
+```json
+{
+  "agent_code": "YOUR_AGENT_CODE",
+  "provider_code": "slot",
+  "player_account": "player01",
+  "transaction_id": "REF034"
+}
+```
+
+### Void
+
+`POST /wallet/void?trace_id=TRACE_ID`
+
+```json
+{
+  "agent_code": "YOUR_AGENT_CODE",
+  "provider_code": "slot",
+  "player_account": "player01",
+  "amount": 61500,
+  "currency": "PHP",
+  "transaction_id": "REF034"
+}
+```
+
+### Aggregator Hybrid Callback (Add/Deduct Balance)
+
+`POST /api/hybrid/callback?trace_id=TRACE_ID`
+
+```json
+{
+  "action": "add",
+  "agent_code": "YOUR_AGENT_CODE",
+  "provider_code": "slot",
+  "player_account": "player01",
+  "amount": 5000,
+  "currency": "PHP",
+  "transaction_id": "AGG-001"
+}
+```
+
+### Hybrid Transaction Listing
+
+`POST /wallet/transactions/list`
+
+```json
+{
+  "player_account": "player01"
+}
+```
+
+### Hybrid Transaction Delete
+
+`POST /wallet/transactions/delete`
+
+```json
+{
+  "player_account": "player01"
+}
+```

@@ -8,4 +8,5 @@ return [
     'agent_key' => 'YOUR_AGENT_KEY',
     'storage_path' => __DIR__ . '/data/players',
     'callback_log_path' => __DIR__ . '/data/callbacks',
+    'hybrid_log_path' => __DIR__ . '/data/hybrid-transactions',
 ];
