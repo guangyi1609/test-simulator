@@ -46,6 +46,27 @@ switch ($path) {
     case '/wallet/deposit':
         handleWalletDeposit($payload, $config, $queryParams);
         break;
+    case '/wallet/withdrawal':
+        handleWalletWithdrawal($payload, $config, $queryParams);
+        break;
+    case '/wallet/balance':
+        handleWalletBalance($payload, $config, $queryParams);
+        break;
+    case '/wallet/check-trans-status':
+        handleWalletTransactionStatus($payload, $config, $queryParams);
+        break;
+    case '/wallet/void':
+        handleWalletVoid($payload, $config, $queryParams);
+        break;
+    case '/wallet/transactions/list':
+        handleWalletTransactionList($payload, $config);
+        break;
+    case '/wallet/transactions/delete':
+        handleWalletTransactionDelete($payload, $config);
+        break;
+    case '/api/hybrid/callback':
+        handleHybridCallback($payload, $config, $queryParams);
+        break;
     default:
         respond(404, ['error' => 'Not found']);
 }
@@ -241,36 +262,419 @@ function handleCallback(array $payload, array $config): void
 
 function handleWalletDeposit(array $payload, array $config, array $queryParams): void
 {
-    $required = ['agent_code', 'player_account', 'amount', 'currency'];
+    $required = ['agent_code', 'provider_code', 'player_account', 'amount', 'currency', 'transaction_id', 'type'];
     foreach ($required as $field) {
         if (!isset($payload[$field]) || $payload[$field] === '') {
-            respond(200, ['status' => '206']);
+            respond(200, ['status' => false, 'code' => '206', 'message' => 'Missing required field']);
         }
     }
     if (!is_string($payload['player_account']) || !is_numeric($payload['amount'])) {
-        respond(200, ['status' => '206']);
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid request']);
     }
 
     $amount = (int) $payload['amount'];
     if ($amount <= 0) {
-        respond(200, ['status' => '206']);
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid amount']);
     }
 
     $playerAccount = $payload['player_account'];
+    $transactionId = (string) $payload['transaction_id'];
+    if (hybridTransactionExists($playerAccount, $transactionId, $config)) {
+        respond(200, ['status' => false, 'code' => '226', 'message' => 'The transaction reference ID has already been used. It must be unique']);
+    }
+
     $playerData = loadPlayer($playerAccount, $config);
     if ($playerData === null) {
         $playerData = createPlayer($playerAccount, $config);
     }
     $playerData = normalizePlayerBalance($playerData);
-    $playerData['balance_cents'] = (int) $playerData['balance_cents'] + $amount;
+    $balanceBefore = (int) $playerData['balance_cents'];
+    $playerData['balance_cents'] = $balanceBefore + $amount;
     $playerData['balance'] = round($playerData['balance_cents'] / 100, 2);
     $playerData['updated_at'] = gmdate('c');
     savePlayer($playerAccount, $playerData, $config);
 
+    $timestamp = date('Y-m-d H:i:s');
+    appendHybridLog($playerAccount, [
+        'datetime' => $timestamp,
+        'action' => 'deposit',
+        'transaction_id' => $transactionId,
+        'transaction_type' => 1,
+        'amount' => $amount,
+        'balance_before' => $balanceBefore,
+        'balance_after' => $playerData['balance_cents'],
+        'currency' => (string) $payload['currency'],
+        'provider_code' => (string) $payload['provider_code'],
+        'agent_code' => (string) $payload['agent_code'],
+        'type' => (string) $payload['type'],
+        'trace_id' => $queryParams['trace_id'] ?? null,
+        'status' => 'complete',
+    ], $config);
+
     $response = [
-        'status' => '000',
+        'status' => true,
+        'code' => '000',
+        'message' => 'Success',
+        'data' => [
+            'player_account' => $playerAccount,
+            'wallet_balance' => (string) $playerData['balance_cents'],
+            'currency' => (string) $payload['currency'],
+            'currency_code' => (string) $payload['currency'],
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ],
+    ];
+    if (!empty($queryParams['trace_id'])) {
+        $response['trace_id'] = (string) $queryParams['trace_id'];
+    }
+
+    respond(200, $response);
+}
+
+function handleWalletWithdrawal(array $payload, array $config, array $queryParams): void
+{
+    $required = ['agent_code', 'provider_code', 'player_account', 'amount', 'currency', 'transaction_id'];
+    foreach ($required as $field) {
+        if (!isset($payload[$field]) || $payload[$field] === '') {
+            respond(200, ['status' => false, 'code' => '206', 'message' => 'Missing required field']);
+        }
+    }
+    if (!is_string($payload['player_account']) || !is_numeric($payload['amount'])) {
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid request']);
+    }
+
+    $amount = (int) $payload['amount'];
+    if ($amount <= 0) {
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid amount']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $transactionId = (string) $payload['transaction_id'];
+    if (hybridTransactionExists($playerAccount, $transactionId, $config)) {
+        respond(200, ['status' => false, 'code' => '226', 'message' => 'The transaction reference ID has already been used. It must be unique']);
+    }
+
+    $playerData = loadPlayer($playerAccount, $config);
+    if ($playerData === null) {
+        $playerData = createPlayer($playerAccount, $config);
+    }
+    $playerData = normalizePlayerBalance($playerData);
+    $balanceBefore = (int) $playerData['balance_cents'];
+    $balanceAfter = $balanceBefore - $amount;
+    if ($balanceAfter < 0) {
+        respond(200, ['status' => false, 'code' => '227', 'message' => 'Insufficient balance']);
+    }
+
+    $playerData['balance_cents'] = $balanceAfter;
+    $playerData['balance'] = round($playerData['balance_cents'] / 100, 2);
+    $playerData['updated_at'] = gmdate('c');
+    savePlayer($playerAccount, $playerData, $config);
+
+    $timestamp = date('Y-m-d H:i:s');
+    appendHybridLog($playerAccount, [
+        'datetime' => $timestamp,
+        'action' => 'withdrawal',
+        'transaction_id' => $transactionId,
+        'transaction_type' => 2,
+        'amount' => $amount,
+        'balance_before' => $balanceBefore,
+        'balance_after' => $playerData['balance_cents'],
+        'currency' => (string) $payload['currency'],
+        'provider_code' => (string) $payload['provider_code'],
+        'agent_code' => (string) $payload['agent_code'],
+        'trace_id' => $queryParams['trace_id'] ?? null,
+        'status' => 'complete',
+    ], $config);
+
+    $response = [
+        'status' => true,
+        'code' => '000',
+        'message' => 'Success',
+        'data' => [
+            'player_account' => $playerAccount,
+            'wallet_balance' => (string) $playerData['balance_cents'],
+            'currency' => (string) $payload['currency'],
+            'currency_code' => (string) $payload['currency'],
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ],
+    ];
+    if (!empty($queryParams['trace_id'])) {
+        $response['trace_id'] = (string) $queryParams['trace_id'];
+    }
+
+    respond(200, $response);
+}
+
+function handleWalletBalance(array $payload, array $config, array $queryParams): void
+{
+    $required = ['agent_code', 'provider_code', 'player_account', 'currency'];
+    foreach ($required as $field) {
+        if (!isset($payload[$field]) || $payload[$field] === '') {
+            respond(200, ['status' => false, 'code' => '206', 'message' => 'Missing required field']);
+        }
+    }
+    if (!is_string($payload['player_account'])) {
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid request']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $playerData = loadPlayer($playerAccount, $config);
+    if ($playerData === null) {
+        respond(200, ['status' => false, 'code' => '226', 'message' => 'Player account provided is invalid or does not exist']);
+    }
+    $playerData = normalizePlayerBalance($playerData);
+
+    $timestamp = date('Y-m-d H:i:s');
+    $response = [
+        'status' => true,
+        'code' => '000',
+        'message' => 'Success',
+        'data' => [
+            'player_account' => $playerAccount,
+            'wallet_balance' => (string) $playerData['balance_cents'],
+            'currency' => (string) $payload['currency'],
+            'currency_code' => (string) $payload['currency'],
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ],
+    ];
+    if (!empty($queryParams['trace_id'])) {
+        $response['trace_id'] = (string) $queryParams['trace_id'];
+    }
+
+    respond(200, $response);
+}
+
+function handleWalletTransactionStatus(array $payload, array $config, array $queryParams): void
+{
+    $required = ['agent_code', 'provider_code', 'transaction_id'];
+    foreach ($required as $field) {
+        if (!isset($payload[$field]) || $payload[$field] === '') {
+            respond(200, ['status' => false, 'code' => '206', 'message' => 'Missing required field']);
+        }
+    }
+
+    $transactionId = (string) $payload['transaction_id'];
+    $entry = findHybridTransaction($payload['player_account'] ?? null, $transactionId, $config);
+    if ($entry === null) {
+        respond(200, ['status' => false, 'code' => '209', 'message' => 'No transaction found with the provided ID']);
+    }
+
+    $response = [
+        'status' => true,
+        'code' => '000',
+        'message' => 'Success',
+        'data' => [
+            'transaction_id' => $transactionId,
+            'transaction_amount' => (string) ($entry['amount'] ?? 0),
+            'transaction_type' => $entry['transaction_type'] ?? null,
+            'balance_before' => (string) ($entry['balance_before'] ?? 0),
+            'balance_after' => (string) ($entry['balance_after'] ?? 0),
+            'status' => $entry['status'] ?? 'complete',
+            'player_account' => $entry['player_account'] ?? null,
+            'created_at' => $entry['datetime'] ?? null,
+        ],
+    ];
+    if (!empty($queryParams['trace_id'])) {
+        $response['trace_id'] = (string) $queryParams['trace_id'];
+    }
+
+    respond(200, $response);
+}
+
+function handleWalletVoid(array $payload, array $config, array $queryParams): void
+{
+    $required = ['agent_code', 'provider_code', 'player_account', 'amount', 'currency', 'transaction_id'];
+    foreach ($required as $field) {
+        if (!isset($payload[$field]) || $payload[$field] === '') {
+            respond(200, ['status' => false, 'code' => '206', 'message' => 'Missing required field']);
+        }
+    }
+    if (!is_string($payload['player_account']) || !is_numeric($payload['amount'])) {
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid request']);
+    }
+
+    $amount = (int) $payload['amount'];
+    if ($amount <= 0) {
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid amount']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $transactionId = (string) $payload['transaction_id'];
+    $existing = findHybridTransaction($playerAccount, $transactionId, $config);
+    if ($existing === null) {
+        respond(200, ['status' => false, 'code' => '209', 'message' => 'No transaction found with the provided ID']);
+    }
+    if (($existing['action'] ?? '') === 'void') {
+        respond(200, ['status' => false, 'code' => '226', 'message' => 'The transaction reference ID has already been used. It must be unique']);
+    }
+
+    $playerData = loadPlayer($playerAccount, $config);
+    if ($playerData === null) {
+        $playerData = createPlayer($playerAccount, $config);
+    }
+    $playerData = normalizePlayerBalance($playerData);
+    $balanceBefore = (int) $playerData['balance_cents'];
+
+    $balanceAfter = $balanceBefore;
+    if (($existing['action'] ?? '') === 'deposit') {
+        $balanceAfter -= $amount;
+    } elseif (($existing['action'] ?? '') === 'withdrawal') {
+        $balanceAfter += $amount;
+    }
+
+    if ($balanceAfter < 0) {
+        respond(200, ['status' => false, 'code' => '227', 'message' => 'Insufficient balance']);
+    }
+
+    $playerData['balance_cents'] = $balanceAfter;
+    $playerData['balance'] = round($playerData['balance_cents'] / 100, 2);
+    $playerData['updated_at'] = gmdate('c');
+    savePlayer($playerAccount, $playerData, $config);
+
+    $timestamp = date('Y-m-d H:i:s');
+    appendHybridLog($playerAccount, [
+        'datetime' => $timestamp,
+        'action' => 'void',
+        'transaction_id' => $transactionId,
+        'transaction_type' => 3,
+        'amount' => $amount,
+        'balance_before' => $balanceBefore,
+        'balance_after' => $playerData['balance_cents'],
+        'currency' => (string) $payload['currency'],
+        'provider_code' => (string) $payload['provider_code'],
+        'agent_code' => (string) $payload['agent_code'],
+        'trace_id' => $queryParams['trace_id'] ?? null,
+        'status' => 'complete',
+    ], $config);
+
+    $response = [
+        'status' => true,
+        'code' => '000',
+        'message' => 'Success',
+        'data' => [
+            'player_account' => $playerAccount,
+            'wallet_balance' => (string) $playerData['balance_cents'],
+            'currency' => (string) $payload['currency'],
+            'currency_code' => (string) $payload['currency'],
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ],
+    ];
+    if (!empty($queryParams['trace_id'])) {
+        $response['trace_id'] = (string) $queryParams['trace_id'];
+    }
+
+    respond(200, $response);
+}
+
+function handleWalletTransactionList(array $payload, array $config): void
+{
+    if (empty($payload['player_account']) || !is_string($payload['player_account'])) {
+        respond(422, ['error' => 'Missing or invalid field: player_account']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $transactions = loadHybridTransactions($playerAccount, $config);
+
+    respond(200, [
         'player_account' => $playerAccount,
-        'wallet_balance' => $playerData['balance_cents'],
+        'transactions' => $transactions,
+    ]);
+}
+
+function handleWalletTransactionDelete(array $payload, array $config): void
+{
+    if (empty($payload['player_account']) || !is_string($payload['player_account'])) {
+        respond(422, ['error' => 'Missing or invalid field: player_account']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $path = hybridLogFilePath($playerAccount, $config);
+    $deleted = false;
+    if (file_exists($path)) {
+        $deleted = unlink($path);
+    }
+
+    respond(200, [
+        'player_account' => $playerAccount,
+        'deleted' => $deleted,
+    ]);
+}
+
+function handleHybridCallback(array $payload, array $config, array $queryParams): void
+{
+    $required = ['action', 'agent_code', 'provider_code', 'player_account', 'amount', 'currency', 'transaction_id'];
+    foreach ($required as $field) {
+        if (!isset($payload[$field]) || $payload[$field] === '') {
+            respond(200, ['status' => false, 'code' => '206', 'message' => 'Missing required field']);
+        }
+    }
+
+    $action = strtolower((string) $payload['action']);
+    if (!in_array($action, ['add', 'deduct'], true)) {
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid action']);
+    }
+    if (!is_string($payload['player_account']) || !is_numeric($payload['amount'])) {
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid request']);
+    }
+
+    $amount = (int) $payload['amount'];
+    if ($amount <= 0) {
+        respond(200, ['status' => false, 'code' => '206', 'message' => 'Invalid amount']);
+    }
+
+    $playerAccount = $payload['player_account'];
+    $transactionId = (string) $payload['transaction_id'];
+    if (hybridTransactionExists($playerAccount, $transactionId, $config)) {
+        respond(200, ['status' => false, 'code' => '226', 'message' => 'The transaction reference ID has already been used. It must be unique']);
+    }
+
+    $playerData = loadPlayer($playerAccount, $config);
+    if ($playerData === null) {
+        $playerData = createPlayer($playerAccount, $config);
+    }
+    $playerData = normalizePlayerBalance($playerData);
+    $balanceBefore = (int) $playerData['balance_cents'];
+    $balanceAfter = $balanceBefore + ($action === 'add' ? $amount : -$amount);
+    if ($balanceAfter < 0) {
+        respond(200, ['status' => false, 'code' => '227', 'message' => 'Insufficient balance']);
+    }
+
+    $playerData['balance_cents'] = $balanceAfter;
+    $playerData['balance'] = round($playerData['balance_cents'] / 100, 2);
+    $playerData['updated_at'] = gmdate('c');
+    savePlayer($playerAccount, $playerData, $config);
+
+    $timestamp = date('Y-m-d H:i:s');
+    appendHybridLog($playerAccount, [
+        'datetime' => $timestamp,
+        'action' => "agg_{$action}",
+        'transaction_id' => $transactionId,
+        'transaction_type' => $action === 'add' ? 4 : 5,
+        'amount' => $amount,
+        'balance_before' => $balanceBefore,
+        'balance_after' => $playerData['balance_cents'],
+        'currency' => (string) $payload['currency'],
+        'provider_code' => (string) $payload['provider_code'],
+        'agent_code' => (string) $payload['agent_code'],
+        'trace_id' => $queryParams['trace_id'] ?? null,
+        'status' => 'complete',
+    ], $config);
+
+    $response = [
+        'status' => true,
+        'code' => '000',
+        'message' => 'Success',
+        'data' => [
+            'player_account' => $playerAccount,
+            'wallet_balance' => (string) $playerData['balance_cents'],
+            'currency' => (string) $payload['currency'],
+            'currency_code' => (string) $payload['currency'],
+            'created_at' => $timestamp,
+            'updated_at' => $timestamp,
+        ],
     ];
     if (!empty($queryParams['trace_id'])) {
         $response['trace_id'] = (string) $queryParams['trace_id'];
@@ -547,6 +951,104 @@ function appendCallbackLog(string $playerAccount, array $entry, array $config): 
     }
 
     file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
+function hybridLogFilePath(string $playerAccount, array $config): string
+{
+    if (!preg_match('/^[a-zA-Z0-9_\-]+$/', $playerAccount)) {
+        respond(422, ['error' => 'player_account must be alphanumeric with optional underscore or dash']);
+    }
+
+    return rtrim($config['hybrid_log_path'], '/') . '/' . $playerAccount . '.log';
+}
+
+function appendHybridLog(string $playerAccount, array $entry, array $config): void
+{
+    $entry['player_account'] = $playerAccount;
+    $path = hybridLogFilePath($playerAccount, $config);
+    $directory = dirname($path);
+    if (!is_dir($directory)) {
+        mkdir($directory, 0775, true);
+    }
+
+    $line = json_encode($entry, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+    if ($line === false) {
+        respond(500, ['error' => 'Failed to encode hybrid log entry']);
+    }
+
+    file_put_contents($path, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
+function loadHybridTransactions(string $playerAccount, array $config): array
+{
+    $path = hybridLogFilePath($playerAccount, $config);
+    if (!file_exists($path)) {
+        return [];
+    }
+
+    $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+    if ($lines === false) {
+        respond(500, ['error' => 'Failed to read hybrid transactions']);
+    }
+
+    $transactions = [];
+    foreach ($lines as $line) {
+        $decoded = json_decode($line, true);
+        if (is_array($decoded)) {
+            $transactions[] = $decoded;
+        }
+    }
+
+    return $transactions;
+}
+
+function hybridTransactionExists(string $playerAccount, string $transactionId, array $config): bool
+{
+    $transactions = loadHybridTransactions($playerAccount, $config);
+    foreach ($transactions as $transaction) {
+        if (!is_array($transaction)) {
+            continue;
+        }
+        if (($transaction['transaction_id'] ?? null) === $transactionId) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function findHybridTransaction(?string $playerAccount, string $transactionId, array $config): ?array
+{
+    if ($playerAccount !== null && $playerAccount !== '') {
+        $transactions = loadHybridTransactions($playerAccount, $config);
+        foreach ($transactions as $transaction) {
+            if (($transaction['transaction_id'] ?? null) === $transactionId) {
+                return $transaction;
+            }
+        }
+        return null;
+    }
+
+    $directory = rtrim($config['hybrid_log_path'], '/');
+    if (!is_dir($directory)) {
+        return null;
+    }
+
+    $files = glob($directory . '/*.log') ?: [];
+    foreach ($files as $file) {
+        $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        if ($lines === false) {
+            continue;
+        }
+        foreach ($lines as $line) {
+            $decoded = json_decode($line, true);
+            if (is_array($decoded) && ($decoded['transaction_id'] ?? null) === $transactionId) {
+                return $decoded;
+            }
+        }
+    }
+
+    return null;
 }
 
 function generateTraceId(): string
