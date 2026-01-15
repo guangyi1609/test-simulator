@@ -2,73 +2,80 @@
 
 declare(strict_types=1);
 
-$config = require __DIR__ . '/../config.php';
-
-header('Content-Type: application/json');
-
-$method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
-$requestUri = $_SERVER['REQUEST_URI'] ?? '/';
-$path = parse_url($requestUri, PHP_URL_PATH) ?: '/';
-$queryParams = [];
-$queryString = parse_url($requestUri, PHP_URL_QUERY);
-if (is_string($queryString)) {
-    parse_str($queryString, $queryParams);
+if (!defined('TEST_SIMULATOR_SKIP_BOOTSTRAP')) {
+    runApp();
 }
 
-if ($method !== 'POST') {
-    respond(405, ['error' => 'Method not allowed']);
-}
+function runApp(): void
+{
+    $config = require __DIR__ . '/../config.php';
 
-$payload = json_decode(file_get_contents('php://input') ?: '', true);
-if (!is_array($payload)) {
-    respond(400, ['error' => 'Invalid JSON body']);
-}
+    header('Content-Type: application/json');
 
-switch ($path) {
-    case '/api/launch':
-        handleLaunch($payload, $config);
-        break;
-    case '/api/credit/topup':
-        handleTopup($payload, $config);
-        break;
-    case '/api/credit/balance':
-        handleBalance($payload, $config);
-        break;
-    case '/api/callback':
-        handleCallback($payload, $config);
-        break;
-    case '/api/callbacks/list':
-        handleCallbackList($payload, $config);
-        break;
-    case '/api/callbacks/delete':
-        handleCallbackDelete($payload, $config);
-        break;
-    case '/wallet/deposit':
-        handleWalletDeposit($payload, $config, $queryParams);
-        break;
-    case '/wallet/withdrawal':
-        handleWalletWithdrawal($payload, $config, $queryParams);
-        break;
-    case '/wallet/balance':
-        handleWalletBalance($payload, $config, $queryParams);
-        break;
-    case '/wallet/check-trans-status':
-        handleWalletTransactionStatus($payload, $config, $queryParams);
-        break;
-    case '/wallet/void':
-        handleWalletVoid($payload, $config, $queryParams);
-        break;
-    case '/wallet/transactions/list':
-        handleWalletTransactionList($payload, $config);
-        break;
-    case '/wallet/transactions/delete':
-        handleWalletTransactionDelete($payload, $config);
-        break;
-    case '/api/hybrid/callback':
-        handleHybridCallback($payload, $config, $queryParams);
-        break;
-    default:
-        respond(404, ['error' => 'Not found']);
+    $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
+    $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
+    $path = parse_url($requestUri, PHP_URL_PATH) ?: '/';
+    $queryParams = [];
+    $queryString = parse_url($requestUri, PHP_URL_QUERY);
+    if (is_string($queryString)) {
+        parse_str($queryString, $queryParams);
+    }
+
+    if ($method !== 'POST') {
+        respond(405, ['error' => 'Method not allowed']);
+    }
+
+    $payload = json_decode(file_get_contents('php://input') ?: '', true);
+    if (!is_array($payload)) {
+        respond(400, ['error' => 'Invalid JSON body']);
+    }
+
+    switch ($path) {
+        case '/api/launch':
+            handleLaunch($payload, $config);
+            break;
+        case '/api/credit/topup':
+            handleTopup($payload, $config);
+            break;
+        case '/api/credit/balance':
+            handleBalance($payload, $config);
+            break;
+        case '/api/callback':
+            handleCallback($payload, $config);
+            break;
+        case '/api/callbacks/list':
+            handleCallbackList($payload, $config);
+            break;
+        case '/api/callbacks/delete':
+            handleCallbackDelete($payload, $config);
+            break;
+        case '/wallet/deposit':
+            handleWalletDeposit($payload, $config, $queryParams);
+            break;
+        case '/wallet/withdrawal':
+            handleWalletWithdrawal($payload, $config, $queryParams);
+            break;
+        case '/wallet/balance':
+            handleWalletBalance($payload, $config, $queryParams);
+            break;
+        case '/wallet/check-trans-status':
+            handleWalletTransactionStatus($payload, $config, $queryParams);
+            break;
+        case '/wallet/void':
+            handleWalletVoid($payload, $config, $queryParams);
+            break;
+        case '/wallet/transactions/list':
+            handleWalletTransactionList($payload, $config);
+            break;
+        case '/wallet/transactions/delete':
+            handleWalletTransactionDelete($payload, $config);
+            break;
+        case '/api/hybrid/callback':
+            handleHybridCallback($payload, $config, $queryParams);
+            break;
+        default:
+            respond(404, ['error' => 'Not found']);
+    }
 }
 
 function handleLaunch(array $payload, array $config): void
