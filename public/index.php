@@ -8,7 +8,8 @@ if (!defined('TEST_SIMULATOR_SKIP_BOOTSTRAP')) {
 
 function runApp(): void
 {
-    $config = require __DIR__ . '/../config.php';
+    $configPath = __DIR__ . '/../config.php';
+    $config = require $configPath;
 
     header('Content-Type: application/json');
 
@@ -72,6 +73,9 @@ function runApp(): void
             break;
         case '/api/hybrid/callback':
             handleHybridCallback($payload, $config, $queryParams);
+            break;
+        case '/api/config/update':
+            handleConfigUpdate($payload, $config, $configPath);
             break;
         default:
             respond(404, ['error' => 'Not found']);
@@ -743,6 +747,40 @@ function handleCallbackDelete(array $payload, array $config): void
     ]);
 }
 
+function handleConfigUpdate(array $payload, array $config, string $configPath): void
+{
+    if (!isset($payload['updates']) || !is_array($payload['updates'])) {
+        respond(422, ['error' => 'Missing or invalid field: updates']);
+    }
+
+    $allowedKeys = array_keys($config);
+    $updates = [];
+    foreach ($payload['updates'] as $key => $value) {
+        if (!is_string($key) || $key === '') {
+            respond(422, ['error' => 'Config keys must be non-empty strings']);
+        }
+        if (!in_array($key, $allowedKeys, true)) {
+            respond(422, ['error' => "Unsupported config key: {$key}"]);
+        }
+        if (!is_string($value)) {
+            respond(422, ['error' => "Config values must be strings for key: {$key}"]);
+        }
+        $updates[$key] = $value;
+    }
+
+    if ($updates === []) {
+        respond(422, ['error' => 'No config updates provided']);
+    }
+
+    $newConfig = array_merge($config, $updates);
+    persistConfig($newConfig, $configPath);
+
+    respond(200, [
+        'updated' => array_keys($updates),
+        'config' => $newConfig,
+    ]);
+}
+
 function signPayload(array $payload, string $agentKey): string
 {
     unset($payload['sign']);
@@ -1068,4 +1106,21 @@ function respond(int $statusCode, array $body): void
     http_response_code($statusCode);
     echo json_encode($body, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
     exit;
+}
+
+function persistConfig(array $config, string $configPath): void
+{
+    $export = var_export($config, true);
+    $contents = <<<PHP
+<?php
+
+declare(strict_types=1);
+
+return {$export};
+
+PHP;
+
+    $tempFile = $configPath . '.tmp';
+    file_put_contents($tempFile, $contents, LOCK_EX);
+    rename($tempFile, $configPath);
 }

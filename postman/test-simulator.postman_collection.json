@@ -297,6 +297,33 @@
       }
     },
     {
+      "name": "Update Config",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{base_url}}/api/config/update",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "api",
+            "config",
+            "update"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"updates\": {\n    \"aggregator_base_url\": \"{{aggregator_base_url}}\",\n    \"agent_code\": \"{{agent_code}}\",\n    \"agent_key\": \"{{agent_key}}\",\n    \"storage_path\": \"{{storage_path}}\",\n    \"callback_log_path\": \"{{callback_log_path}}\",\n    \"hybrid_log_path\": \"{{hybrid_log_path}}\"\n  }\n}"
+        }
+      }
+    },
+    {
       "name": "Wallet Deposit",
       "request": {
         "method": "POST",
@@ -681,6 +708,26 @@
     {
       "key": "hybrid_transaction_id",
       "value": "AGG-001"
+    },
+    {
+      "key": "aggregator_base_url",
+      "value": "https://aggregator.k8stestingpurposes.cc/api"
+    },
+    {
+      "key": "agent_key",
+      "value": "YOUR_AGENT_KEY"
+    },
+    {
+      "key": "storage_path",
+      "value": "/workspace/test-simulator/data/players"
+    },
+    {
+      "key": "callback_log_path",
+      "value": "/workspace/test-simulator/data/callbacks"
+    },
+    {
+      "key": "hybrid_log_path",
+      "value": "/workspace/test-simulator/data/hybrid-transactions"
     }
   ]
 }
