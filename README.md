@@ -124,6 +124,20 @@ Handles seamless wallet callbacks from the aggregator. Supported actions include
 }
 ```
 
+### Update Config
+
+`POST /api/config/update`
+
+```json
+{
+  "updates": {
+    "aggregator_base_url": "https://example.com/api",
+    "agent_code": "NEW_AGENT_CODE",
+    "agent_key": "NEW_AGENT_KEY"
+  }
+}
+```
+
 ## Hybrid Wallet (Transfer Wallet) API
 
 These endpoints simulate the hybrid transfer wallet flow, including transaction logging per user in server timezone.
