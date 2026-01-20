@@ -11,11 +11,15 @@ function runApp(): void
     $configPath = __DIR__ . '/../config.php';
     $config = require $configPath;
 
-    header('Content-Type: application/json');
-
     $method = $_SERVER['REQUEST_METHOD'] ?? 'GET';
     $requestUri = $_SERVER['REQUEST_URI'] ?? '/';
     $path = parse_url($requestUri, PHP_URL_PATH) ?: '/';
+    if ($method === 'GET' && $path === '/healthz') {
+        http_response_code(200);
+        exit;
+    }
+
+    header('Content-Type: application/json');
     $queryParams = [];
     $queryString = parse_url($requestUri, PHP_URL_QUERY);
     if (is_string($queryString)) {
