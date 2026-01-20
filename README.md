@@ -9,6 +9,37 @@
 php -S 0.0.0.0:8080 -t public
 ```
 
+## Docker
+
+The repository already includes a `Dockerfile` you can use to build and run the service locally or publish to Docker Hub.
+
+### Build and run locally
+
+```bash
+docker build -t test-simulator:local .
+docker run --rm -p 8080:8080 test-simulator:local
+```
+
+### Build and push to Docker Hub
+
+1. Log in to Docker Hub (replace `YOUR_DOCKERHUB_USERNAME`):
+
+```bash
+docker login
+```
+
+2. Build and tag the image:
+
+```bash
+docker build -t YOUR_DOCKERHUB_USERNAME/test-simulator:latest .
+```
+
+3. Push the image:
+
+```bash
+docker push YOUR_DOCKERHUB_USERNAME/test-simulator:latest
+```
+
 ## API Endpoints
 
 ### Launch Game
