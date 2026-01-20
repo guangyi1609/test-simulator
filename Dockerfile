@@ -1,9 +1,9 @@
-FROM php:8.2-cli
+FROM php:8.2-apache
 
-WORKDIR /app
+WORKDIR /var/www/html
 
-COPY . /app
+COPY . /var/www/html
 
-EXPOSE 8080
+RUN sed -i 's|/var/www/html|/var/www/html/public|g' /etc/apache2/sites-available/000-default.conf
 
-CMD ["php", "-S", "0.0.0.0:8080", "-t", "public"]
+EXPOSE 80
